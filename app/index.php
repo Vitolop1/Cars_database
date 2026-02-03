@@ -26,7 +26,6 @@ $vehicle_types = $pdo->query("
 
 // ADD CAR
 if (isset($_POST['add_car'])) {
-
     $manu  = (int)($_POST['manufacturer_id'] ?? 0);
     $model = trim($_POST['model'] ?? "");
     $year  = (int)($_POST['year'] ?? 0);
@@ -36,38 +35,44 @@ if (isset($_POST['add_car'])) {
     $price   = trim($_POST['price_usd'] ?? "");
 
     if ($manu && $model !== "" && $year && $type) {
+        try {
+            $stmtAdd = $pdo->prepare("
+                INSERT INTO cars (manufacturer_id, model, year, type_id, country_of_origin, price_usd)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
 
-        $stmt = $pdo->prepare("
-            INSERT INTO cars (manufacturer_id, model, year, type_id, country_of_origin, price_usd)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+            $stmtAdd->execute([
+                $manu,
+                $model,
+                $year,
+                $type,
+                ($country !== "" ? $country : null),
+                ($price !== "" ? $price : null)
+            ]);
 
-        $stmt->execute([
-            $manu,
-            $model,
-            $year,
-            $type,
-            ($country !== "" ? $country : null),
-            ($price !== "" ? $price : null)
-        ]);
-
-        $message = "Car added.";
+            $message = "Car added successfully.";
+        } catch (PDOException $e) {
+            $message = "Add failed: " . $e->getMessage();
+        }
     } else {
-        $message = "Missing info.";
+        $message = "Missing info (manufacturer, model, year, type).";
     }
 }
 
 // DELETE CAR
 if (isset($_POST['delete_car'])) {
-
     $carid = (int)($_POST['car_id'] ?? 0);
 
     if ($carid) {
-        $stmt = $pdo->prepare("DELETE FROM cars WHERE car_id = ?");
-        $stmt->execute([$carid]);
-        $message = "Deleted.";
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM cars WHERE car_id = ?");
+            $stmtDel->execute([$carid]);
+            $message = "Deleted (if the ID existed).";
+        } catch (PDOException $e) {
+            $message = "Delete failed: " . $e->getMessage();
+        }
     } else {
-        $message = "Missing info.";
+        $message = "Missing Car ID.";
     }
 }
 
@@ -90,12 +95,10 @@ $stmt = $pdo->prepare("
        OR CAST(c.price_usd AS CHAR) LIKE ?
     ORDER BY c.car_id
 ");
-
 $stmt->execute([$q, $qLike, $qLike, $qLike, $qLike, $qLike, $qLike]);
 
 // SUBQUERY
 if (isset($_GET['count_cars'])) {
-
     $manu_id = (int)($_GET['manufacturer_id'] ?? 0);
 
     if ($manu_id) {
@@ -111,10 +114,10 @@ if (isset($_GET['count_cars'])) {
         if ($r) {
             $subq_message = $r['manufacturer_name'] . ": " . $r['car_count'] . " cars.";
         } else {
-            $subq_message = "Not found.";
+            $subq_message = "Manufacturer not found.";
         }
     } else {
-        $subq_message = "Missing info.";
+        $subq_message = "Missing manufacturer selection.";
     }
 }
 ?>
@@ -124,103 +127,222 @@ if (isset($_GET['count_cars'])) {
   <meta charset="utf-8">
   <title>Cars Database</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background: #f6f7fb; }
+    .brand-pill {
+      font-size: .85rem;
+      background: rgba(13,110,253,.08);
+      border: 1px solid rgba(13,110,253,.15);
+      color: #0d6efd;
+      padding: .35rem .6rem;
+      border-radius: 999px;
+    }
+    .card { border: 0; box-shadow: 0 10px 24px rgba(0,0,0,.06); }
+    .table thead th { background: #0b1320; color: #fff; position: sticky; top: 0; }
+    .table-wrap { max-height: 420px; overflow: auto; border-radius: .75rem; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
 </head>
+
 <body>
+<div class="container py-4">
 
-<h2>Cars</h2>
+  <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Cars Database</h1>
+      <div class="text-secondary">PHP + MariaDB + Docker • Add / Search / Delete / Subquery</div>
+    </div>
+    <div class="brand-pill">Open to opportunities • Student / Junior</div>
+  </div>
 
-<?php if ($message): ?>
-  <p><b><?php echo h($message); ?></b></p>
-<?php endif; ?>
+  <?php if ($message): ?>
+    <div class="alert alert-info mb-3">
+      <strong>Info:</strong> <?php echo h($message); ?>
+    </div>
+  <?php endif; ?>
 
-<h3>Add Car</h3>
-<form method="POST">
-  Manufacturer:<br>
-  <select name="manufacturer_id" required>
-    <option value="">Select...</option>
-    <?php foreach ($manufacturers as $m): ?>
-      <option value="<?php echo (int)$m['manufacturer_id']; ?>">
-        <?php echo h($m['manufacturer_name']); ?>
-      </option>
-    <?php endforeach; ?>
-  </select><br><br>
+  <?php if ($subq_message): ?>
+    <div class="alert alert-success mb-3">
+      <strong>Result:</strong> <?php echo h($subq_message); ?>
+    </div>
+  <?php endif; ?>
 
-  Model:<br>
-  <input type="text" name="model" required><br><br>
+  <div class="row g-3">
 
-  Year:<br>
-  <input type="number" name="year" required><br><br>
+    <!-- Add Car -->
+    <div class="col-12 col-lg-6">
+      <div class="card p-3">
+        <h2 class="h5 mb-3">Add Car</h2>
 
-  Type:<br>
-  <select name="type_id" required>
-    <option value="">Select...</option>
-    <?php foreach ($vehicle_types as $t): ?>
-      <option value="<?php echo (int)$t['type_id']; ?>">
-        <?php echo h($t['type_name']); ?>
-      </option>
-    <?php endforeach; ?>
-  </select><br><br>
+        <form method="POST">
+          <div class="mb-2">
+            <label class="form-label">Manufacturer</label>
+            <select class="form-select" name="manufacturer_id" required>
+              <option value="">Select...</option>
+              <?php foreach ($manufacturers as $m): ?>
+                <option value="<?php echo (int)$m['manufacturer_id']; ?>">
+                  <?php echo h($m['manufacturer_name']); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-  Country:<br>
-  <input type="text" name="country_of_origin"><br><br>
+          <div class="mb-2">
+            <label class="form-label">Model</label>
+            <input class="form-control" type="text" name="model" placeholder="e.g., Civic" required>
+          </div>
 
-  Price (USD):<br>
-  <input type="number" step="0.01" name="price_usd"><br><br>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Year</label>
+              <input class="form-control" type="number" name="year" placeholder="2023" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Type</label>
+              <select class="form-select" name="type_id" required>
+                <option value="">Select...</option>
+                <?php foreach ($vehicle_types as $t): ?>
+                  <option value="<?php echo (int)$t['type_id']; ?>">
+                    <?php echo h($t['type_name']); ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
 
-  <input type="submit" name="add_car" value="Add">
-</form>
+          <div class="row g-2 mt-1">
+            <div class="col-6">
+              <label class="form-label">Country (optional)</label>
+              <input class="form-control" type="text" name="country_of_origin" placeholder="e.g., Japan">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Price USD (optional)</label>
+              <input class="form-control" type="number" step="0.01" name="price_usd" placeholder="e.g., 23000">
+            </div>
+          </div>
 
-<hr>
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" type="submit" name="add_car">Add</button>
+            <a class="btn btn-outline-secondary" href="<?php echo h($_SERVER['PHP_SELF']); ?>">Reset</a>
+          </div>
+        </form>
+      </div>
+    </div>
 
-<h3>Search</h3>
-<form method="GET">
-  <input type="text" name="q" value="<?php echo h($q); ?>">
-  <input type="submit" value="Search">
-</form>
+    <!-- Delete + Subquery -->
+    <div class="col-12 col-lg-6">
+      <div class="card p-3 mb-3">
+        <h2 class="h5 mb-3">Delete Car</h2>
+        <form method="POST" class="row g-2">
+          <div class="col-8">
+            <label class="form-label">Car ID</label>
+            <input class="form-control" type="number" name="car_id" placeholder="e.g., 12" required>
+          </div>
+          <div class="col-4 d-flex align-items-end">
+            <button class="btn btn-danger w-100" type="submit" name="delete_car">Delete</button>
+          </div>
+        </form>
+        <div class="text-secondary mt-2" style="font-size:.9rem;">
+          Tip: You can find the ID in the table below.
+        </div>
+      </div>
 
-<br>
+      <div class="card p-3">
+        <h2 class="h5 mb-3">Count Cars Per Manufacturer (Subquery)</h2>
 
-<table border="1" cellpadding="4">
-  <tr>
-    <th>ID</th><th>Manufacturer</th><th>Model</th><th>Year</th>
-    <th>Type</th><th>Country</th><th>Price</th>
-  </tr>
-  <?php while ($row = $stmt->fetch(PDO::FETCH_NUM)): ?>
-    <tr>
-      <?php foreach ($row as $val): ?>
-        <td><?php echo h($val); ?></td>
-      <?php endforeach; ?>
-    </tr>
-  <?php endwhile; ?>
-</table>
+        <form method="GET" class="row g-2">
+          <div class="col-8">
+            <label class="form-label">Manufacturer</label>
+            <select class="form-select" name="manufacturer_id">
+              <option value="">Select...</option>
+              <?php foreach ($manufacturers as $m): ?>
+                <option value="<?php echo (int)$m['manufacturer_id']; ?>">
+                  <?php echo h($m['manufacturer_name']); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-4 d-flex align-items-end">
+            <button class="btn btn-success w-100" type="submit" name="count_cars">Count</button>
+          </div>
 
-<hr>
+          <?php if ($q !== ''): ?>
+            <input type="hidden" name="q" value="<?php echo h($q); ?>">
+          <?php endif; ?>
+        </form>
+      </div>
+    </div>
 
-<h3>Delete Car</h3>
-<form method="POST">
-  Car ID:<br>
-  <input type="number" name="car_id" required><br><br>
-  <input type="submit" name="delete_car" value="Delete">
-</form>
+    <!-- Search + Table -->
+    <div class="col-12">
+      <div class="card p-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-2">
+          <div>
+            <h2 class="h5 mb-1">Search</h2>
+            <div class="text-secondary" style="font-size:.9rem;">Search by manufacturer, model, year, type, country, or price.</div>
+          </div>
+          <form method="GET" class="d-flex gap-2">
+            <input class="form-control" style="min-width: 260px;" type="text" name="q" value="<?php echo h($q); ?>" placeholder="Try: BMW, 2023, SUV...">
+            <button class="btn btn-outline-primary" type="submit">Search</button>
+            <a class="btn btn-outline-secondary" href="<?php echo h($_SERVER['PHP_SELF']); ?>">Clear</a>
+          </form>
+        </div>
 
-<hr>
+        <div class="table-wrap mt-3">
+          <table class="table table-striped table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:70px;">ID</th>
+                <th>Manufacturer</th>
+                <th>Model</th>
+                <th style="width:90px;">Year</th>
+                <th>Type</th>
+                <th>Country</th>
+                <th style="width:140px;">Price (USD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php
+                $hasRows = false;
+                while ($row = $stmt->fetch(PDO::FETCH_NUM)):
+                  $hasRows = true;
+              ?>
+                <tr>
+                  <td class="mono"><?php echo h($row[0]); ?></td>
+                  <td><?php echo h($row[1]); ?></td>
+                  <td><?php echo h($row[2]); ?></td>
+                  <td><?php echo h($row[3]); ?></td>
+                  <td><?php echo h($row[4]); ?></td>
+                  <td><?php echo h($row[5]); ?></td>
+                  <td><?php echo h($row[6]); ?></td>
+                </tr>
+              <?php endwhile; ?>
 
-<h3>Count Cars Per Manufacturer</h3>
-<form method="GET">
-  <select name="manufacturer_id">
-    <option value="">Select...</option>
-    <?php foreach ($manufacturers as $m): ?>
-      <option value="<?php echo (int)$m['manufacturer_id']; ?>">
-        <?php echo h($m['manufacturer_name']); ?>
-      </option>
-    <?php endforeach; ?>
-  </select><br><br>
-  <input type="submit" name="count_cars" value="Count">
-</form>
+              <?php if (!$hasRows): ?>
+                <tr>
+                  <td colspan="7" class="text-center text-secondary py-4">
+                    No results. Try a different search.
+                  </td>
+                </tr>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
 
-<?php if ($subq_message): ?>
-  <p><b><?php echo h($subq_message); ?></b></p>
-<?php endif; ?>
+        <div class="text-secondary mt-2" style="font-size:.85rem;">
+          <span class="mono">Tip:</span> This project runs locally via Docker Compose. Recruiters/devs can clone the repo and run <span class="mono">docker compose up</span>.
+        </div>
+      </div>
+    </div>
 
+  </div>
+</div>
+
+<!-- Bootstrap JS (AL FINAL, correcto) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -1,20 +1,12 @@
 services:
-  db:
-    image: mariadb:10.4
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: Cars_database
-    volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "3306:3306"
-
   web:
-    build: .
-    volumes:
-      - ./app:/var/www/html
+    build:
+      context: .
+      dockerfile: dockerfile
     ports:
       - "8080:80"
+    volumes:
+      - ./app/public:/var/www/html
+      - ./app/config:/var/www/config
     depends_on:
       - db
-

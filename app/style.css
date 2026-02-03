@@ -98,6 +98,11 @@ input, select{
   background:rgba(0,0,0,.25);
   color:var(--text);
   outline:none;
+  font-family:var(--sans);
+}
+
+input:focus, select:focus{
+  border-color:var(--accent);
 }
 
 .row{
@@ -123,8 +128,14 @@ button{
   background:rgba(77,163,255,.18);
   color:var(--text);
   border:1px solid rgba(77,163,255,.35);
+  font-family:var(--sans);
+  font-size:14px;
+  transition: all 0.2s ease;
 }
-button:hover{filter:brightness(1.1)}
+button:hover{
+  filter:brightness(1.15);
+  transform: translateY(-1px);
+}
 button.danger{
   background:rgba(255,77,109,.12);
   border:1px solid rgba(255,77,109,.35);
@@ -142,9 +153,27 @@ button.secondary{
   border:1px solid var(--line);
   background:rgba(255,255,255,.04);
   color:var(--text);
+  animation: slideIn 0.3s ease;
 }
-.alert.ok{border-color: rgba(45,212,191,.35); background: rgba(45,212,191,.09);}
-.alert.bad{border-color: rgba(255,77,109,.35); background: rgba(255,77,109,.09);}
+.alert.ok{
+  border-color: rgba(45,212,191,.35); 
+  background: rgba(45,212,191,.09);
+}
+.alert.bad{
+  border-color: rgba(255,77,109,.35); 
+  background: rgba(255,77,109,.09);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 .table-wrap{
   margin-top:14px;
@@ -152,6 +181,7 @@ button.secondary{
   border-radius:var(--radius);
   border:1px solid var(--line);
   background:rgba(0,0,0,.22);
+  max-height: 500px;
 }
 table{
   width:100%;
@@ -162,19 +192,46 @@ th,td{
   padding:10px 12px;
   border-bottom:1px solid var(--line);
   font-size:13px;
+  text-align:left;
 }
 th{
-  text-align:left;
   color:var(--muted);
   font-weight:600;
   position:sticky;
   top:0;
   background:rgba(10,16,30,.95);
+  backdrop-filter: blur(10px);
+  z-index: 10;
 }
-td.mono{font-family:var(--mono); color:rgba(234,240,255,.9);}
-small.muted{color:var(--muted)}
+tbody tr{
+  transition: background 0.2s ease;
+}
+tbody tr:hover{
+  background:rgba(255,255,255,.03);
+}
+tbody tr:last-child td{
+  border-bottom:none;
+}
+td.mono{
+  font-family:var(--mono); 
+  color:rgba(234,240,255,.9);
+}
+small.muted{
+  color:var(--muted);
+  font-size:12px;
+  display:block;
+  margin-top:8px;
+}
 .footer{
   margin-top:14px;
   color:var(--muted);
   font-size:12px;
+  line-height:1.6;
+}
+.mono{
+  font-family:var(--mono);
+  background:rgba(255,255,255,.06);
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:11px;
 }

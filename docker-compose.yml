@@ -1,21 +1,47 @@
+version: '3.8'
+
 services:
   db:
     image: mariadb:10.4
+    container_name: cars_db
+    restart: unless-stopped
     environment:
-      MARIADB_DATABASE: Cars_database
-      MARIADB_USER: cars_user
-      MARIADB_PASSWORD: cars_pass
-      MARIADB_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: cars_db
+      MYSQL_USER: cars_user
+      MYSQL_PASSWORD: cars_pass
+      MYSQL_ROOT_PASSWORD: root_pass
     volumes:
+      - db_data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "3306:3306"
+    networks:
+      - cars_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cars_web
+    restart: unless-stopped
     ports:
       - "8080:80"
     volumes:
-      - ./app:/var/www/html
+      - ./app/public:/var/www/html
+      - ./app/style.css:/var/www/html/style.css
+      - ./app/config:/var/www/html/config
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - cars_network
+
+volumes:
+  db_data:
+
+networks:
+  cars_network:
+    driver: bridge

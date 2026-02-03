@@ -1,0 +1,19 @@
+services:
+  db:
+    image: mariadb:10.4
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: Cars_database
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+
+  web:
+    image: php:8.2-apache
+    volumes:
+      - ./app:/var/www/html
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
